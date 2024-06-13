@@ -9,5 +9,5 @@ cd GenAI
 git clone https://github.com/viks01/GenAI.git
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r ./GenAI/requirements.txt
 ```
