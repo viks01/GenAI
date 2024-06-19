@@ -11,3 +11,17 @@ $ python3 -m venv venv
 $ source venv/bin/activate
 $ pip install -r ./GenAI/requirements.txt
 ```
+
+## Usage
+To run the server, run the following commands:
+```bash
+$ cd GenAI/backend
+$ python3 app.py
+```
+
+To run the react app, run the following commands in a new terminal window:
+```bash
+$ cd GenAI/frontend
+$ npm install
+$ npm start
+```
