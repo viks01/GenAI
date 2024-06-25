@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 const RecipeRequest = () => {
     const [recipeName, setRecipeName] = useState('');
     const [links, setLinks] = useState([]);
+    const [recipeDetails, setRecipeDetails] = useState([]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -16,6 +17,17 @@ const RecipeRequest = () => {
         })
         .then(response => response.json())
         .then(data => setLinks(data))
+        .catch(error => console.error('Error:', error));
+
+        fetch('http://127.0.0.1:5000/api/recipe_details', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ recipeName })
+        })
+        .then(response => response.json())
+        .then(data => setRecipeDetails(data))
         .catch(error => console.error('Error:', error));
     };
 
@@ -41,6 +53,9 @@ const RecipeRequest = () => {
                         </li>
                     ))}
                 </ul>
+                <br />
+                <h2>Recipe Details</h2>
+                <p>{recipeDetails.response}</p>
             </div>
         </div>
     );

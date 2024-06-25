@@ -1,12 +1,19 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS, cross_origin
 from pinecone import Pinecone, ServerlessSpec
-from openai import OpenAI
+# from langchain_community.embeddings.openai import OpenAIEmbeddings
+# from langchain_community.llms.openai import OpenAI
+from langchain_openai import OpenAIEmbeddings, OpenAI
+import openai
 import os
 from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 # Stored recipes
 recipes = [
@@ -26,42 +33,35 @@ recipes = [
 # Initialize Pinecone
 pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
 
-# Create a Pinecone index (if it doesn't exist) which stores the recipe embeddings (vectors)
-index_name = "recipes-index"
+index_name = "recipes-index3"
 if index_name not in [index.name for index in pc.list_indexes()]:
     pc.create_index(
         name=index_name,
         dimension=1536,
-        metric="euclidean",
+        metric='cosine',
         spec=ServerlessSpec(
-            cloud="aws",
-            region="us-east-1"
-        ) 
+            cloud='aws',
+            region='us-east-1'
+        )
     )
 
 index = pc.Index(index_name)
 
 
-# Initialize OpenAI
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+# Initialize OpenAI model
+openai.api_key = os.getenv('OPENAI_API_KEY')
+embeddings_model = OpenAIEmbeddings(model="text-embedding-ada-002")
+language_model = OpenAI(model="gpt-3.5-turbo")
 
-# Function to get the embedding of a text using OpenAI
-# def get_embedding(text):
-#     response = openai.Embedding.create(
-#         input=text,
-#         model="text-embedding-ada-002"  # Specify the model
-#     )
-#     return response['data'][0]['embedding']
-
-def get_embedding(text, model="text-embedding-ada-002"):
-   text = text.replace("\n", " ")
-   return client.embeddings.create(input = [text], model=model).data[0].embedding
+def get_embedding(text):
+    return embeddings_model.embed_query(text)
 
 
-# Insert initial recipes into the Pinecone index
+# Insert initial recipes into Pinecone
 def insert_initial_recipes():
     for recipe in recipes:
-        recipe_embedding = get_embedding(recipe['title']) # Here we use the recipe title as the text to get the embedding
+        text_for_embedding = f"{recipe['title']} {recipe['url']}"
+        recipe_embedding = get_embedding(text_for_embedding)
         index.upsert([(recipe['id'], recipe_embedding)])
 
 insert_initial_recipes()
@@ -69,12 +69,13 @@ insert_initial_recipes()
 
 # API section
 @app.route('/api/recipes', methods=['POST'])
+@cross_origin()
 def get_recipes():
     data = request.get_json()
     recipe_name = data.get('recipeName')
     query_embedding = get_embedding(recipe_name)
 
-    response = index.query(query_embedding, top_k=5)
+    response = index.query(vector=query_embedding, top_k=5)
     matches = response['matches']
 
     matched_recipes = []
@@ -83,7 +84,30 @@ def get_recipes():
             if recipe['id'] == match['id']:
                 matched_recipes.append({"title": recipe['title'], "url": recipe['url']})
 
-    return matched_recipes
+    return jsonify(matched_recipes)
+
+
+@app.route('/api/recipe_details', methods=['POST'])
+@cross_origin()
+def get_recipe_details():
+    data = request.get_json()
+    recipe_name = data.get('recipeName')
+    query_embedding = get_embedding(recipe_name)
+
+    response = index.query(vector=query_embedding, top_k=1)
+    matches = response['matches']
+
+    if matches:
+        recipe_id = matches[0]['id']
+        for recipe in recipes:
+            if recipe['id'] == recipe_id:
+                # Use GPT-3.5 to generate a detailed response
+                context = f"Recipe: {recipe['title']} - {recipe['url']}"
+                prompt = f"{context}\n\nCould you give me the steps to make {recipe_name}?"
+                completion = language_model(prompt)
+                return jsonify({"response": completion['choices'][0]['text']})
+    return jsonify({"response": "Recipe not found."})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
