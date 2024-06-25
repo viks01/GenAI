@@ -12,6 +12,8 @@ $ source venv/bin/activate
 $ pip install -r ./GenAI/requirements.txt
 ```
 
+Add your API keys in the `GenAI/backend/.env` file.
+
 ## Usage
 To run the server, run the following commands:
 ```bash
