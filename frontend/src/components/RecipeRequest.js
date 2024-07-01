@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
+import {
+    TextField, Button, CircularProgress,
+    List, ListItem, ListItemText, Typography, Box
+} from '@mui/material';
 
 const RecipeRequest = () => {
     const [recipeName, setRecipeName] = useState('');
     const [links, setLinks] = useState([]);
     const [recipeDetails, setRecipeDetails] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [detailsLoading, setDetailsLoading] = useState(false);
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        setLoading(true);
+        setDetailsLoading(true);
         
         fetch('http://127.0.0.1:5000/api/recipes', {
             method: 'POST',
@@ -16,8 +24,14 @@ const RecipeRequest = () => {
             body: JSON.stringify({ recipeName })
         })
         .then(response => response.json())
-        .then(data => setLinks(data))
-        .catch(error => console.error('Error:', error));
+        .then(data => {
+            setLinks(data);
+            setLoading(false);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            setLoading(false);
+        });
 
         fetch('http://127.0.0.1:5000/api/recipe_details', {
             method: 'POST',
@@ -27,37 +41,59 @@ const RecipeRequest = () => {
             body: JSON.stringify({ recipeName })
         })
         .then(response => response.json())
-        .then(data => setRecipeDetails(data))
-        .catch(error => console.error('Error:', error));
+        .then(data => {
+            setRecipeDetails(data);
+            setDetailsLoading(false);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            setDetailsLoading(false);
+        });
     };
 
     return (
-        <div>
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="text"
+        <Box>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', width: '100%' }}>
+                <TextField
+                    label="Type your query"
+                    variant="outlined"
                     value={recipeName}
                     onChange={(e) => setRecipeName(e.target.value)}
-                    placeholder="Enter recipe name"
+                    style={{ marginBottom: '20px', width: '80%' }}
+                    InputLabelProps={{
+                        style: { color: 'grey' }, // Label color
+                    }}
+                    InputProps={{
+                        style: { color: 'black' }, // Text color
+                    }}
                 />
-                <button type="submit">Search</button>
+                <Button type="submit" variant="contained" color="primary">
+                    Search
+                </Button>
             </form>
-            <div>
-                <h2>Recipe Links</h2>
-                <ul>
+            {loading && <CircularProgress style={{ marginTop: '20px' }} />}
+            <Box className="results-section">
+                <Typography variant="h5" component="h2" gutterBottom>
+                    Recipe Links
+                </Typography>
+                <List>
                     {links.map((link, index) => (
-                        <li key={index}>
-                            <a href={link.url} target="_blank" rel="noopener noreferrer">
-                                {link.title}
-                            </a>
-                        </li>
+                        <ListItem key={index} component="a" href={link.url} target="_blank" rel="noopener noreferrer" button>
+                            <ListItemText primary={link.title} style={{ color: 'black' }} />
+                        </ListItem>
                     ))}
-                </ul>
+                </List>
                 <br />
-                <h2>Recipe Details</h2>
-                <p>{recipeDetails.response}</p>
-            </div>
-        </div>
+                <Typography variant="h5" component="h2" gutterBottom>
+                    Recipe Details
+                </Typography>
+                {detailsLoading ? (
+                    <CircularProgress style={{ marginTop: '20px' }} />
+                ) : (
+                    <Typography variant="body1" style={{ color: 'black' }}>{recipeDetails.response}</Typography>
+                )}
+            </Box>
+        </Box>
     );
 };
 

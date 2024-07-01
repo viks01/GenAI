@@ -91,6 +91,10 @@ def insert_initial_recipes():
 insert_initial_recipes()
 
 
+# Store conversation history
+conversation_history = {}
+
+
 # API section
 @app.route('/api/recipes', methods=['POST'])
 @cross_origin()
@@ -115,6 +119,13 @@ def get_recipes():
     return jsonify(matched_recipes)
 
 
+# Questions:
+# 1. Give me the recipe for Dal Makhani.
+# 2. Give me all north indian recipes.
+# 3. Give me the recipe for Dal Makhani and provide links to the recipe.
+# Feed context directly into the model
+# Get the pdfs or html docs and feed them into the model along with the links
+
 @app.route('/api/recipe_details', methods=['POST'])
 @cross_origin()
 def get_recipe_details():
@@ -133,7 +144,6 @@ def get_recipe_details():
         recipe_id = matches[0]['id']
         for recipe in recipes:
             if recipe['id'] == recipe_id:
-                # Use GPT-3.5 to generate a detailed response
                 context = f"Recipe: {recipe['title']} - {recipe['url']}"
                 prompt = f"{context}\n\nCould you give me the steps to make {recipe_name}?"
                 # completion = language_model(prompt)
@@ -141,6 +151,50 @@ def get_recipe_details():
                 completion = generator(prompt, max_length=1500)
                 return jsonify({"response": completion[0]['generated_text']})
     return jsonify({"response": "Recipe not found."})
+
+
+@app.route('/api/chat', methods=['POST'])
+@cross_origin()
+def chat():
+    data = request.get_json()
+    user_id = data.get('userId')
+    user_query = data.get('query')
+
+    # Initialize conversation history if not exists
+    if user_id not in conversation_history:
+        conversation_history[user_id] = []
+
+    # Append the user query to the conversation history
+    conversation_history[user_id].append(f"User: {user_query}")
+
+    query_embedding = get_embedding(user_query)
+
+    try:
+        response = index.query(vector=query_embedding, top_k=1)
+        matches = response['matches']
+    except Exception as e:
+        return jsonify({"response": "Error querying Pinecone."}), 500
+
+    if matches:
+        recipe_id = matches[0]['id']
+        for recipe in recipes:
+            if recipe['id'] == recipe_id:
+                context = f"Recipe: {recipe['title']} - {recipe['url']}"
+                prompt = f"{context}\n\n{user_query}?"
+                conversation_history[user_id].append(f"System: {context}")
+                conversation_history[user_id].append(f"Prompt: {prompt}")
+                completion = generator(prompt, max_length=150)
+
+                system_response = completion[0]['generated_text']
+                conversation_history[user_id].append(f"System: {system_response}")
+                
+                return jsonify({"response": system_response})
+    
+    # If no relevant recipe found, generate a default response
+    default_response = "I'm sorry, I couldn't find any related recipe. Can you please provide more details or ask about a specific recipe?"
+    conversation_history[user_id].append(f"System: {default_response}")
+    
+    return jsonify({"response": default_response})
 
 
 if __name__ == '__main__':

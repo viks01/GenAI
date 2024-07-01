@@ -1,15 +1,21 @@
 import React from 'react';
-import './App.css';
+import { Container, CssBaseline, Typography } from '@mui/material';
 import RecipeRequest from './components/RecipeRequest';
+import ChatBot from './components/ChatBot';
+import './App.css';
 
 function App() {
     return (
-        <div className="App">
+        <Container component="main" maxWidth="sm">
+            <CssBaseline />
             <header className="App-header">
-                <h1>Recipe Finder</h1>
-                <RecipeRequest />
+                <Typography variant="h3" component="h1" gutterBottom>
+                    Recipe Finder
+                </Typography>
             </header>
-        </div>
+            {/* <RecipeRequest /> */}
+            <ChatBot />
+        </Container>
     );
 }
 
